@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import { ethers } from 'ethers';
 import MessagingArtifact from "./artifacts/contracts/Messaging.sol/Messaging.json";
-const messagingAddress = "0x9Ee69C0daFf57A0932Cb46C5f57F75E636C897B1";
+const messagingAddress = "0x2F0F7c59230640D975C038574A0fd92fb5D2cb06";
 
 function App() {
   const [messages, setMessages] = useState([]);
-  const [newProduct, setNewProduct] = useState({text: ''});
+  const [newMessage, setNewMessage] = useState({text: ''});
   const [user, setUser] = useState(null);
 
   async function requestAccount() {
@@ -21,42 +21,49 @@ function App() {
     return contract;
   }
 
-  async function loadProducts() {
+  async function loadMessages() {
     try {
         const contract = await _initialContract(provider);
         const arr = await contract.getMessages();
         const owner = await signer.getAddress();  
         setUser(owner);
 
-        const allProducts = arr.map(item => {
+        const allMessages = arr.map(item => {
             return {
                 text: item[0],
                 sender: item[1],
+                createdAt: item[2]
             };
         });
 
-        setMessages(allProducts);
+        setMessages(allMessages);
     } catch(err) {
        console.log(err)
     }
     
 }
 
+function timestampToDate(timestamp) {
+  const date = new Date(timestamp * 1000);
+  const formattedDate = date.toLocaleString();
+  return formattedDate;
+}
+
 window.ethereum.on('accountsChanged', (accounts) => {
   const newAccount = accounts[0];
   setUser(newAccount);
-  loadProducts();
+  loadMessages();
 });
 
 const initial_contract = new ethers.Contract(messagingAddress, MessagingArtifact.abi, provider);
-initial_contract.on('SendMessage', (text, sender, event) => {
-  loadProducts();
+initial_contract.on('SendMessage', (text, sender, createdAt, event) => {
+  loadMessages();
 });
 
 const handleInputChange = (event) => {
   const { name, value } = event.target;
-  setNewProduct({
-      ...newProduct,
+  setNewMessage({
+      ...newMessage,
       [name]: value
   });
 }
@@ -70,9 +77,8 @@ async function addProduct() {
       const addItem = await contract.sendMessage(text);
       await addItem.wait();
 
-      document.getElementById('message').value = '';
-
-      loadProducts();
+      setNewMessage({text: ''});
+      loadMessages();
 
   } catch(err) {
       console.log(err)
@@ -81,22 +87,26 @@ async function addProduct() {
 }
 
 useEffect(() => {
-  loadProducts();
+  loadMessages();
 }, [])
 
   return (
     <div className="app">
-      <header className='header'><h1>Decentralized Messaging Application</h1></header>
+      <header className='header'>
+        <h1>Welcome to, P2P-Chat-Hub</h1>
+        <p>P2P-Chat-Hub is a decentralized peer-to-peer chat application that prioritizes your privacy and security.</p>
+      </header>
       <div className="message-area">
         {messages.map((message, index) => (
           <div key={index} className={`message ${message.sender === user ? 'sent' : 'received'}`}>
              <div className="sender-blob">{message.sender.slice(2, 8)}</div>
              <div className="message-text">{message.text}</div>
+             <div className="createdAt-blob">{timestampToDate(message.createdAt)}</div>
           </div>
         ))}
       </div>
       <div className="input-area">
-        <input type="text" id="message" name="message" value={newProduct.name} onChange={handleInputChange} required />
+        <input type="text" id="message" name="text" value={newMessage.text} onChange={handleInputChange} required />
         <button onClick={addProduct}>Send</button>
       </div>
     </div>
